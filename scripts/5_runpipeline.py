@@ -18,6 +18,37 @@ DEFAULT_THREADS = 90
 # Detect MiXCR JAR in scripts directory by default
 DEFAULT_MIXCR_JAR = os.path.join("scripts", "mixcr.jar")
 
+def get_scripts_directory():
+    """Get the directory containing the scripts, trying multiple possible locations."""
+    # Try to get it from the package installation first
+    try:
+        import pairtcr
+        package_dir = os.path.dirname(pairtcr.__file__)
+        scripts_dir_package = os.path.join(package_dir, 'scripts')
+        if os.path.isdir(scripts_dir_package):
+            return scripts_dir_package
+    except ImportError:
+        pass
+    
+    # Fallback 1: relative to current script location
+    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(current_script_dir) == 'scripts':
+        # We're running from the scripts directory
+        return current_script_dir
+    
+    # Fallback 2: scripts directory relative to current working directory
+    scripts_dir_relative = os.path.join(os.getcwd(), 'scripts')
+    if os.path.isdir(scripts_dir_relative):
+        return scripts_dir_relative
+    
+    # Fallback 3: assume scripts directory in same directory as this script
+    scripts_dir_sibling = os.path.join(os.path.dirname(current_script_dir), 'scripts')
+    if os.path.isdir(scripts_dir_sibling):
+        return scripts_dir_sibling
+    
+    # If all else fails, return the relative path and let the caller handle the error
+    return "scripts"
+
 class PipelineRunner:
     def __init__(self, input_dir, output_root, prefix, read_limit, threads, mixcr_jar, force_restart=False, use_c_version=False):
         self.input_dir = input_dir
@@ -28,6 +59,9 @@ class PipelineRunner:
         self.mixcr_jar = mixcr_jar
         self.force_restart = force_restart
         self.use_c_version = use_c_version
+        
+        # Get the correct scripts directory
+        self.scripts_dir = get_scripts_directory()
         
         # Define all output directories
         self.step1_output = os.path.join(output_root, "1_preprocess_and_trim_output")
@@ -227,7 +261,7 @@ class PipelineRunner:
         
         if self.use_c_version:
             # Use C version
-            c_executable = os.path.join("scripts", "1_preprocess_and_trim")
+            c_executable = os.path.join(self.scripts_dir, "1_preprocess_and_trim")
             if not os.path.exists(c_executable):
                 print(f"Error: C executable not found at {c_executable}")
                 print("Please compile the C version first by running 'make' in the scripts directory")
@@ -243,8 +277,9 @@ class PipelineRunner:
             step_name = "Step 1: Preprocess and Trim (C version)"
         else:
             # Use Python version
+            script_path = os.path.join(self.scripts_dir, "1_preprocess_and_trim.py")
             cmd = [
-                "python3", "scripts/1_preprocess_and_trim.py",
+                "python3", script_path,
                 self.input_dir,
                 "-n", str(self.read_limit),
                 "-o", self.prefix,
@@ -265,8 +300,9 @@ class PipelineRunner:
             print("Step 2: Create UMI Pairs - SKIPPED (already completed)")
             return True
         
+        script_path = os.path.join(self.scripts_dir, "2_create_umi_pairs.py")
         cmd = [
-            "python3", "scripts/2_create_umi_pairs.py",
+            "python3", script_path,
             "-i", self.step1_output,
             "-p", self.prefix,
             "-o", self.umi_pairs_file
@@ -521,8 +557,9 @@ echo "--- MiXCR Analysis and Export Steps Completed ---"
         tra_export = os.path.join(self.step3_output, "TRA_alignments_export_with_headers.tsv")
         trb_export = os.path.join(self.step3_output, "TRB_alignments_export_with_headers.tsv")
         
+        script_path = os.path.join(self.scripts_dir, "4_pair_and_filter_clones.py")
         cmd = [
-            "python3", "scripts/4_pair_and_filter_clones.py",
+            "python3", script_path,
             "--umi-pairs", self.umi_pairs_file,
             "--tra-export", tra_export,
             "--trb-export", trb_export,

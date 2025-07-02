@@ -65,8 +65,24 @@ def run_script(script_name, args=None):
 
 def run_pipeline():
     """Entry point for pairtcr-pipeline command"""
-    # Skip the first argument (program name) and pass the rest to the script
+    # Get the correct scripts directory path
+    scripts_dir = get_scripts_dir()
+    mixcr_jar_path = os.path.join(scripts_dir, 'mixcr.jar')
+    
+    # Parse arguments to check if --mixcr-jar is already specified
     args = sys.argv[1:] if len(sys.argv) > 1 else []
+    
+    # Check if --mixcr-jar is already in the arguments
+    mixcr_jar_specified = False
+    for i, arg in enumerate(args):
+        if arg == '--mixcr-jar' or arg.startswith('--mixcr-jar='):
+            mixcr_jar_specified = True
+            break
+    
+    # If --mixcr-jar is not specified and the package mixcr.jar exists, add it
+    if not mixcr_jar_specified and os.path.exists(mixcr_jar_path):
+        args.extend(['--mixcr-jar', mixcr_jar_path])
+    
     run_script('5_runpipeline.py', args)
 
 def run_preprocess():
