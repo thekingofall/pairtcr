@@ -37,15 +37,15 @@ graph TD
     subgraph "Step 1: Preprocessing"
         B(1_preprocess_and_trim.py)
         A --> B
-        B --> C[TRA-specific FASTQ files<br/>(Header contains UMI)]
-        B --> D[TRB-specific FASTQ files<br/>(Header contains UMI)]
+        B --> C["TRA-specific FASTQ files<br/>(Header contains UMI)"]
+        B --> D["TRB-specific FASTQ files<br/>(Header contains UMI)"]
     end
 
     subgraph "Step 2: UMI Pairing"
         E(2_create_umi_pairs.py)
         C --> E
         D --> E
-        E --> F[umi_pairs.tsv<br/>(TRA_ReadID <-> TRB_ReadID)]
+        E --> F["umi_pairs.tsv<br/>(TRA_ReadID <-> TRB_ReadID)"]
     end
 
     subgraph "Step 2.5: FASTQ Filtering (Optimization)"
@@ -53,16 +53,16 @@ graph TD
         F --> G
         C --> G
         D --> G
-        G --> H[Matched TRA FASTQs<br/>(Only reads in pairs)]
-        G --> I[Matched TRB FASTQs<br/>(Only reads in pairs)]
+        G --> H["Matched TRA FASTQs<br/>(Only reads in pairs)"]
+        G --> I["Matched TRB FASTQs<br/>(Only reads in pairs)"]
     end
 
     subgraph "Step 3: TCR Annotation"
         J(3_run_mixcr_and_export.sh)
         H --> J
         I --> J
-        J --> K[TRA Alignments TSV<br/>(MiXCR output)]
-        J --> L[TRB Alignments TSV<br/>(MiXCR output)]
+        J --> K["TRA Alignments TSV<br/>(MiXCR output)"]
+        J --> L["TRB Alignments TSV<br/>(MiXCR output)"]
     end
 
     subgraph "Step 4: Final Assembly & Filtering"
@@ -70,7 +70,7 @@ graph TD
         F --> M
         K --> M
         L --> M
-        M --> N{Final Paired Clones Table<br/>(TRA_CDR3, TRB_CDR3)}
+        M --> N{"Final Paired Clones Table<br/>(TRA_CDR3, TRB_CDR3)"}
     end
 
     style A fill:#e6e6e6,stroke:#333,stroke-width:2px

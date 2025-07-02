@@ -37,15 +37,15 @@ graph TD
     subgraph "步骤 1: 预处理"
         B(1_preprocess_and_trim.py)
         A --> B
-        B --> C[TRA 特异性 FASTQ 文件<br/>(头部含 UMI)]
-        B --> D[TRB 特异性 FASTQ 文件<br/>(头部含 UMI)]
+        B --> C["TRA 特异性 FASTQ 文件<br/>(头部含 UMI)"]
+        B --> D["TRB 特异性 FASTQ 文件<br/>(头部含 UMI)"]
     end
 
     subgraph "步骤 2: UMI 配对"
         E(2_create_umi_pairs.py)
         C --> E
         D --> E
-        E --> F[umi_pairs.tsv<br/>(TRA_ReadID <-> TRB_ReadID)]
+        E --> F["umi_pairs.tsv<br/>(TRA_ReadID <-> TRB_ReadID)"]
     end
 
     subgraph "步骤 2.5: FASTQ 筛选 (优化)"
@@ -53,16 +53,16 @@ graph TD
         F --> G
         C --> G
         D --> G
-        G --> H[匹配的 TRA FASTQ<br/>(仅含配对中的读段)]
-        G --> I[匹配的 TRB FASTQ<br/>(仅含配对中的读段)]
+        G --> H["匹配的 TRA FASTQ<br/>(仅含配对中的读段)"]
+        G --> I["匹配的 TRB FASTQ<br/>(仅含配对中的读段)"]
     end
 
     subgraph "步骤 3: TCR 注释"
         J(3_run_mixcr_and_export.sh)
         H --> J
         I --> J
-        J --> K[TRA 比对结果 TSV<br/>(MiXCR 输出)]
-        J --> L[TRB 比对结果 TSV<br/>(MiXCR 输出)]
+        J --> K["TRA 比对结果 TSV<br/>(MiXCR 输出)"]
+        J --> L["TRB 比对结果 TSV<br/>(MiXCR 输出)"]
     end
 
     subgraph "步骤 4: 最终组装与筛选"
@@ -70,7 +70,7 @@ graph TD
         F --> M
         K --> M
         L --> M
-        M --> N{最终配对克隆表<br/>(TRA_CDR3, TRB_CDR3)}
+        M --> N{"最终配对克隆表<br/>(TRA_CDR3, TRB_CDR3)"}
     end
 
     style A fill:#e6e6e6,stroke:#333,stroke-width:2px
