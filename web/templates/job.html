@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PairTCR Job Monitor - {{ job.id[:8] }}...</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.0/socket.io.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            padding: 30px;
+            max-width: 1400px;
+        }
+        
+        /* Responsive adjustments for better log viewing */
+        @media (min-width: 992px) {
+            .log-container {
+                height: 650px !important;
+                max-height: 75vh !important;
+            }
+        }
+        
+        @media (max-width: 991px) {
+            .log-container {
+                height: 500px !important;
+                max-height: 60vh !important;
+            }
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 20px;
+        }
+        .progress-section {
+            margin-bottom: 20px;
+        }
+        .log-container {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 20px;
+            height: 600px;
+            max-height: 70vh;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            color: #00ff00;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .log-entry {
+            margin-bottom: 4px;
+            word-wrap: break-word;
+        }
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+        .log-entry.warning {
+            color: #feca57;
+        }
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 8px 16px;
+            border-radius: 20px;
+        }
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status-running {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+        .status-completed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-failed {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .download-section {
+            background: #e8f5e8;
+            border: 2px dashed #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .btn-download {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 30px;
+            color: white;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.4);
+            color: white;
+        }
+        .info-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .auto-scroll-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #00ff00;
+            border-radius: 5px;
+            padding: 5px 10px;
+            font-size: 11px;
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="header">
+                <h2><i class="fas fa-cogs me-3"></i>PairTCR Pipeline Monitor</h2>
+                <p class="text-muted">Job ID: {{ job.id }}</p>
+                <a href="/" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Home
+                </a>
+            </div>
+
+            <div class="row">
+                <!-- Job Information -->
+                <div class="col-lg-3 col-md-4">
+                    <div class="card info-card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-info-circle me-2"></i>Job Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <strong>Status:</strong>
+                                <span id="jobStatus" class="status-badge status-{{ job.status }}">
+                                    {{ job.status.title() }}
+                                </span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Created:</strong><br>
+                                <span id="createdAt">{{ job.created_at }}</span>
+                            </div>
+                            {% if job.started_at %}
+                            <div class="mb-3">
+                                <strong>Started:</strong><br>
+                                <span id="startedAt">{{ job.started_at }}</span>
+                            </div>
+                            {% endif %}
+                            {% if job.completed_at %}
+                            <div class="mb-3">
+                                <strong>Completed:</strong><br>
+                                <span id="completedAt">{{ job.completed_at }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="mb-3">
+                                <strong>Current Step:</strong><br>
+                                <span id="currentStep">{{ job.current_step or 'Pending' }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Parameters -->
+                    <div class="card info-card mt-3">
+                        <div class="card-header">
+                            <h6><i class="fas fa-sliders-h me-2"></i>Parameters</h6>
+                        </div>
+                        <div class="card-body">
+                            <small>
+                                <strong>Input:</strong> {{ job.params.input_dir }}<br>
+                                {% if job.params.output_dir %}
+                                <strong>Output:</strong> {{ job.params.output_dir }}<br>
+                                {% else %}
+                                <strong>Output:</strong> (Default: same level as input with prefix name)<br>
+                                {% endif %}
+                                <strong>Prefix:</strong> {{ job.params.prefix }}<br>
+                                <strong>Read Limit:</strong> {{ "{:,}".format(job.params.read_limit) }}<br>
+                                <strong>Threads:</strong> {{ job.params.threads }}<br>
+                                <strong>C Version:</strong> {{ 'Yes' if job.params.use_c_version else 'No' }}
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Download Section -->
+                    {% if job.status == 'completed' %}
+                    <div id="downloadSection">
+                        <div class="download-section">
+                            <h5><i class="fas fa-download me-2"></i>Results Ready!</h5>
+                            <p>Your pipeline has completed successfully.</p>
+                            <a href="/api/download/{{ job.id }}" class="btn-download">
+                                <i class="fas fa-file-archive me-2"></i>Download Results
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div id="downloadSection" style="display: none;">
+                        <div class="download-section">
+                            <h5><i class="fas fa-download me-2"></i>Results Ready!</h5>
+                            <p>Your pipeline has completed successfully.</p>
+                            <a href="/api/download/{{ job.id }}" class="btn-download">
+                                <i class="fas fa-file-archive me-2"></i>Download Results
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Error Section -->
+                    {% if job.error_message %}
+                    <div class="alert alert-danger mt-3">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Error</h6>
+                        <p class="mb-0">{{ job.error_message }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Progress and Logs -->
+                <div class="col-lg-9 col-md-8">
+                    <!-- Progress Bar -->
+                    <div class="progress-section">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5><i class="fas fa-tasks me-2"></i>Progress</h5>
+                            <span id="progressPercent">{{ job.progress }}%</span>
+                        </div>
+                        <div class="progress" style="height: 20px;">
+                            <div id="progressBar" class="progress-bar bg-success" 
+                                 role="progressbar" 
+                                 style="width: {{ job.progress }}%"
+                                 aria-valuenow="{{ job.progress }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real-time Logs -->
+                    <div class="position-relative">
+                        <h5><i class="fas fa-terminal me-2"></i>Live Logs</h5>
+                        <button id="autoScrollToggle" class="auto-scroll-toggle" onclick="toggleAutoScroll()">
+                            Auto-scroll: ON
+                        </button>
+                        <div id="logContainer" class="log-container">
+                            {% for message in job.log_messages %}
+                            <div class="log-entry">{{ message }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const jobId = '{{ job.id }}';
+        let autoScroll = true;
+        let socket;
+
+        // Initialize Socket.IO connection
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                console.log('Connected to server');
+                socket.emit('join_job', {job_id: jobId});
+            });
+
+            socket.on('job_update', function(data) {
+                updateJobStatus(data);
+            });
+
+            socket.on('log_update', function(data) {
+                if (data.job_id === jobId) {
+                    addLogMessage(data.message);
+                }
+            });
+
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server');
+            });
+        }
+
+        function updateJobStatus(job) {
+            // Update status badge
+            const statusElement = document.getElementById('jobStatus');
+            statusElement.className = `status-badge status-${job.status}`;
+            statusElement.textContent = job.status.charAt(0).toUpperCase() + job.status.slice(1);
+
+            // Update progress bar
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+            progressBar.style.width = job.progress + '%';
+            progressBar.setAttribute('aria-valuenow', job.progress);
+            progressPercent.textContent = job.progress + '%';
+
+            // Update current step
+            document.getElementById('currentStep').textContent = job.current_step || 'Pending';
+
+            // Show download section if completed
+            if (job.status === 'completed') {
+                document.getElementById('downloadSection').style.display = 'block';
+            }
+
+            // Update timestamps
+            if (job.started_at) {
+                const startedElement = document.getElementById('startedAt');
+                if (startedElement) {
+                    startedElement.textContent = new Date(job.started_at).toLocaleString();
+                }
+            }
+            if (job.completed_at) {
+                const completedElement = document.getElementById('completedAt');
+                if (completedElement) {
+                    completedElement.textContent = new Date(job.completed_at).toLocaleString();
+                }
+            }
+
+            // Add pulse animation for running status
+            if (job.status === 'running') {
+                statusElement.classList.add('pulse');
+            } else {
+                statusElement.classList.remove('pulse');
+            }
+        }
+
+        function addLogMessage(message) {
+            const logContainer = document.getElementById('logContainer');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            
+            // Add color coding for different log types
+            if (message.toLowerCase().includes('error')) {
+                logEntry.classList.add('error');
+            } else if (message.toLowerCase().includes('warning')) {
+                logEntry.classList.add('warning');
+            }
+            
+            logEntry.textContent = message;
+            logContainer.appendChild(logEntry);
+
+            // Auto-scroll to bottom if enabled
+            if (autoScroll) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            const button = document.getElementById('autoScrollToggle');
+            button.textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
+            button.style.backgroundColor = autoScroll ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)';
+            
+            if (autoScroll) {
+                const logContainer = document.getElementById('logContainer');
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        // Manual scroll detection to disable auto-scroll
+        document.getElementById('logContainer').addEventListener('scroll', function() {
+            const container = this;
+            const isAtBottom = Math.abs(container.scrollTop - (container.scrollHeight - container.clientHeight)) < 5;
+            
+            if (!isAtBottom && autoScroll) {
+                toggleAutoScroll();
+            }
+        });
+
+        // Poll for updates every 5 seconds as fallback
+        function pollJobStatus() {
+            fetch(`/api/job/${jobId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && !data.error) {
+                        updateJobStatus(data);
+                    }
+                })
+                .catch(error => console.error('Error polling job status:', error));
+        }
+
+        // Initialize everything
+        initializeSocket();
+        setInterval(pollJobStatus, 5000); // Fallback polling every 5 seconds
+
+        // Refresh page title based on status
+        function updatePageTitle(status) {
+            const statusEmojis = {
+                'pending': '⏳',
+                'running': '🔄',
+                'completed': '✅',
+                'failed': '❌'
+            };
+            document.title = `${statusEmojis[status] || '🔬'} PairTCR Job - ${jobId.substring(0, 8)}...`;
+        }
+
+        // Initial title update
+        updatePageTitle('{{ job.status }}');
+    </script>
+</body>
+</html> 

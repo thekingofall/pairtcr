@@ -260,13 +260,17 @@ class PipelineRunner:
             return True
         
         if self.use_c_version:
-            # Use C version
+            # Try to use C version
             c_executable = os.path.join(self.scripts_dir, "1_preprocess_and_trim")
             if not os.path.exists(c_executable):
-                print(f"Error: C executable not found at {c_executable}")
-                print("Please compile the C version first by running 'make' in the scripts directory")
-                return False
-            
+                print(f"Warning: C executable not found at {c_executable}")
+                print("Falling back to Python version for preprocessing...")
+                self.logger.warning("C executable not found, falling back to Python version")
+                self.use_c_version = False  # Switch to Python version
+        
+        if self.use_c_version:
+            # Use C version (confirmed to exist)
+            c_executable = os.path.join(self.scripts_dir, "1_preprocess_and_trim")
             cmd = [
                 c_executable,
                 self.input_dir,
@@ -666,12 +670,36 @@ echo "--- MiXCR Analysis and Export Steps Completed ---"
             self.cleanup_incomplete_run()
         
         try:
-            # Run all pipeline steps
-            self.step1_preprocess_and_trim()
-            self.step2_create_umi_pairs()
-            self.step2_5_create_matched_fastq()
-            self.step3_run_mixcr()
-            self.step4_pair_and_filter()
+            # Run all pipeline steps with proper error checking
+            if not self.step1_preprocess_and_trim():
+                error_msg = "Step 1 (Preprocess and Trim) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
+                
+            if not self.step2_create_umi_pairs():
+                error_msg = "Step 2 (Create UMI Pairs) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
+                
+            if not self.step2_5_create_matched_fastq():
+                error_msg = "Step 2.5 (Create Matched FASTQ) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
+                
+            if not self.step3_run_mixcr():
+                error_msg = "Step 3 (Run MiXCR) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
+                
+            if not self.step4_pair_and_filter():
+                error_msg = "Step 4 (Pair and Filter Clones) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
             
             print("\n" + "="*60)
             print("PIPELINE COMPLETED SUCCESSFULLY!")
@@ -686,84 +714,9 @@ echo "--- MiXCR Analysis and Export Steps Completed ---"
             self.logger.info(f"Final output file: {self.final_output}")
             self.logger.info(f"All intermediate files are saved in: {self.output_root}")
             
-            # Print summary of outputs
-            print("\nOutput Summary:")
-            print(f"  Step 1 outputs: {self.step1_output}")
-            print(f"  Step 2 outputs: {self.step2_output}")
-            print(f"  Matched FASTQ: {self.matched_fastq_output}")
-            print(f"  Step 3 outputs: {self.step3_output}")
-            print(f"  Step 4 outputs: {self.step4_output}")
-            print(f"  Logs directory: {self.logs_output}")
-            print(f"  Final result: {self.final_output}")
-            
-            # Log output summary
-            self.logger.info("Output Summary:")
-            self.logger.info(f"  Step 1 outputs: {self.step1_output}")
-            self.logger.info(f"  Step 2 outputs: {self.step2_output}")
-            self.logger.info(f"  Matched FASTQ: {self.matched_fastq_output}")
-            self.logger.info(f"  Step 3 outputs: {self.step3_output}")
-            self.logger.info(f"  Step 4 outputs: {self.step4_output}")
-            self.logger.info(f"  Logs directory: {self.logs_output}")
-            self.logger.info(f"  Final result: {self.final_output}")
-            
-            # Print log files summary
-            print("\nLog Files:")
-            print(f"  Main pipeline log: {self.pipeline_log}")
-            for step, log_file in self.step_logs.items():
-                print(f"  {step.upper()} log: {log_file}")
-            
-            self.logger.info("Log Files:")
-            self.logger.info(f"  Main pipeline log: {self.pipeline_log}")
-            for step, log_file in self.step_logs.items():
-                self.logger.info(f"  {step.upper()} log: {log_file}")
-            
         except Exception as e:
             error_msg = f"Pipeline failed with error: {e}"
             self.logger.error(error_msg)
             print(f"\n{error_msg}")
             print(f"Check the main log file for details: {self.pipeline_log}")
-            sys.exit(1)
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="PairTCR Pipeline: Complete workflow for paired TCR analysis",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    
-    parser.add_argument("input_dir", nargs='?', default=DEFAULT_INPUT_DIR,
-                        help="Path to directory containing input FASTQ files")
-    parser.add_argument("-o", "--output-root", default=DEFAULT_OUTPUT_ROOT,
-                        help="Root directory for all pipeline outputs")
-    parser.add_argument("-p", "--prefix", default=DEFAULT_PREFIX,
-                        help="Prefix for output files")
-    parser.add_argument("-n", "--read-limit", type=int, default=DEFAULT_READ_LIMIT,
-                        help="Maximum number of read pairs to process")
-    parser.add_argument("-t", "--threads", type=int, default=DEFAULT_THREADS,
-                        help="Number of threads for MiXCR")
-    parser.add_argument("--mixcr-jar", default=DEFAULT_MIXCR_JAR,
-                        help="Path to MiXCR JAR file")
-    parser.add_argument("--force", action="store_true",
-                        help="Force restart pipeline from beginning, even if already completed")
-    parser.add_argument("--use-python", action="store_true",
-                        help="Use Python version of preprocessor instead of faster C version")
-    
-    args = parser.parse_args()
-    
-    # Create pipeline runner and execute
-    pipeline = PipelineRunner(
-        input_dir=args.input_dir,
-        output_root=args.output_root,
-        prefix=args.prefix,
-        read_limit=args.read_limit,
-        threads=args.threads,
-        mixcr_jar=args.mixcr_jar,
-        force_restart=args.force,
-        use_c_version=not args.use_python  # Default to C version unless --use-python is specified
-    )
-    
-    pipeline.run_pipeline()
-
-
-if __name__ == "__main__":
-    main() 
+            sys.exit(1) 

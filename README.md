@@ -105,6 +105,40 @@ If you use PairTCR in your research, please cite:
 [Citation information to be added]
 ```
 
+## Web Interface
+
+PairTCR now includes a modern web interface for easy pipeline execution and monitoring!
+
+### Quick Start with Web Interface
+
+```bash
+# Install web dependencies
+cd web
+pip install -r requirements.txt
+
+# Start the web server
+python start_server.py
+```
+
+Or use the convenient launcher from the project root:
+
+```bash
+python start_web.py
+```
+
+Then open your browser and go to: http://localhost:5000
+
+### Web Interface Features
+
+- 🌐 **Intuitive Web Interface**: Modern responsive design
+- 🔄 **Real-time Monitoring**: Live logs and progress tracking  
+- 🚀 **Background Execution**: Jobs run in the background
+- 📦 **One-click Download**: Automatic result packaging
+- 📱 **Mobile Friendly**: Works on phones and tablets
+- ⚙️ **Parameter Configuration**: Full control over all pipeline options
+
+For detailed web interface documentation, see: [web/README.md](web/README.md)
+
 ## Support
 
 - Issues: https://github.com/yourusername/pairtcr/issues

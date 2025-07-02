@@ -1,0 +1,9 @@
+# Ignore test results and temporary files
+results/
+*.log
+*.tmp
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db 

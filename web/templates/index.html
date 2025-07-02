@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PairTCR Web Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 50px auto;
+            padding: 40px;
+            max-width: 800px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            color: #4a5568;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #718096;
+            font-size: 1.1rem;
+        }
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .form-label {
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+        .form-control {
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            padding: 12px;
+            transition: all 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        .advanced-options {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+        .toggle-advanced {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .toggle-advanced:hover {
+            color: #5a67d8;
+        }
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-pending { background-color: #fbbf24; }
+        .status-running { background-color: #3b82f6; }
+        .status-completed { background-color: #10b981; }
+        .status-failed { background-color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-container">
+            <div class="header">
+                <h1><i class="fas fa-dna me-3"></i>PairTCR Pipeline</h1>
+                <p>High-performance paired T-cell receptor sequencing analysis</p>
+            </div>
+
+            <!-- Alert for status messages -->
+            <div id="alertContainer"></div>
+
+            <!-- Main Form -->
+            <div class="form-section">
+                <form id="pipelineForm">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label for="inputDir" class="form-label">
+                                <i class="fas fa-folder me-2"></i>Input Directory
+                            </label>
+                            <input type="text" class="form-control" id="inputDir" name="input_dir" 
+                                   placeholder="/path/to/your/fastq/files" required>
+                            <div class="form-text">Directory containing paired-end FASTQ files</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="prefix" class="form-label">
+                                <i class="fas fa-tag me-2"></i>File Prefix
+                            </label>
+                            <input type="text" class="form-control" id="prefix" name="prefix" 
+                                   value="TCR_TSO_18" placeholder="TCR_TSO_18">
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <label for="outputDir" class="form-label">
+                                <i class="fas fa-folder-open me-2"></i>Output Directory
+                            </label>
+                            <input type="text" class="form-control" id="outputDir" name="output_dir" 
+                                   placeholder="Leave empty to use input directory with prefix name">
+                            <div class="form-text">Output directory for results (default: same level as input directory with prefix name)</div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="readLimit" class="form-label">
+                                <i class="fas fa-list-ol me-2"></i>Read Limit
+                            </label>
+                            <input type="number" class="form-control" id="readLimit" name="read_limit" 
+                                   value="100000000" min="1000">
+                            <div class="form-text">Maximum number of read pairs to process</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="threads" class="form-label">
+                                <i class="fas fa-microchip me-2"></i>Threads
+                            </label>
+                            <input type="number" class="form-control" id="threads" name="threads" 
+                                   value="4" min="1" max="64">
+                            <div class="form-text">Number of CPU threads for MiXCR</div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Options -->
+                    <div class="advanced-options">
+                        <a href="#" class="toggle-advanced" onclick="toggleAdvanced(); return false;">
+                            <i class="fas fa-cog me-2"></i>Advanced Options <i class="fas fa-chevron-down"></i>
+                        </a>
+                        
+                        <div id="advancedOptions" style="display: none; margin-top: 20px;">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <label for="mixcrJar" class="form-label">
+                                        <i class="fas fa-file-archive me-2"></i>MiXCR JAR Path
+                                    </label>
+                                    <input type="text" class="form-control" id="mixcrJar" name="mixcr_jar" 
+                                           value="../scripts/mixcr.jar" placeholder="../scripts/mixcr.jar">
+                                    <div class="form-text">Path to MiXCR JAR file or executable</div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="usePythonVersion" name="use_python_version">
+                                        <label class="form-check-label" for="usePythonVersion">
+                                            <i class="fas fa-code me-2"></i>Use Python Version (Slower)
+                                        </label>
+                                        <div class="form-text">Default uses faster C version</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="forceRestart" name="force_restart">
+                                        <label class="form-check-label" for="forceRestart">
+                                            <i class="fas fa-redo me-2"></i>Force Restart
+                                        </label>
+                                        <div class="form-text">Delete existing results and start fresh</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play me-2"></i>Start Pipeline
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Job Lookup Section -->
+            <div class="form-section">
+                <h5><i class="fas fa-search me-2"></i>查看任务</h5>
+                <p class="text-muted">输入任务ID查看运行状态和日志</p>
+                <div class="row">
+                    <div class="col-md-8">
+                        <input type="text" class="form-control" id="jobIdInput" 
+                               placeholder="输入任务ID (例如: abc12345-6789-def0-1234-567890abcdef)">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-outline-primary w-100" onclick="lookupJob()">
+                            <i class="fas fa-search me-2"></i>查看任务
+                        </button>
+                    </div>
+                </div>
+                <div class="form-text mt-2">
+                    💡 提交任务后您会获得一个唯一的任务ID，保存此ID可以随时查看任务进度
+                </div>
+            </div>
+
+            <!-- Recent Jobs -->
+            <div id="recentJobs" style="display: none;">
+                <h5><i class="fas fa-history me-2"></i>Recent Jobs</h5>
+                <div id="jobsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleAdvanced() {
+            const options = document.getElementById('advancedOptions');
+            const icon = document.querySelector('.toggle-advanced i:last-child');
+            
+            if (options.style.display === 'none') {
+                options.style.display = 'block';
+                icon.className = 'fas fa-chevron-up';
+            } else {
+                options.style.display = 'none';
+                icon.className = 'fas fa-chevron-down';
+            }
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertContainer.appendChild(alertDiv);
+            
+            // Auto-hide after 5 seconds for info alerts
+            if (type === 'info') {
+                setTimeout(() => {
+                    const alert = new bootstrap.Alert(alertDiv);
+                    alert.close();
+                }, 5000);
+            }
+        }
+
+        function addJobToList(job) {
+            const jobsList = document.getElementById('jobsList');
+            const recentJobs = document.getElementById('recentJobs');
+            
+            const jobDiv = document.createElement('div');
+            jobDiv.className = 'card mb-2';
+            jobDiv.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="status-indicator status-${job.status}"></span>
+                            Job ${job.id.substring(0, 8)}... 
+                            <small class="text-muted">(${new Date(job.created_at).toLocaleString()})</small>
+                        </div>
+                        <a href="/job/${job.id}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-1"></i>View
+                        </a>
+                    </div>
+                </div>
+            `;
+            
+            jobsList.insertBefore(jobDiv, jobsList.firstChild);
+            recentJobs.style.display = 'block';
+            
+            // Keep only last 5 jobs
+            while (jobsList.children.length > 5) {
+                jobsList.removeChild(jobsList.lastChild);
+            }
+        }
+
+        document.getElementById('pipelineForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const params = {};
+            
+            for (let [key, value] of formData.entries()) {
+                if (key === 'use_python_version' || key === 'force_restart') {
+                    params[key] = true;
+                } else if (key === 'read_limit' || key === 'threads') {
+                    params[key] = parseInt(value);
+                } else {
+                    params[key] = value;
+                }
+            }
+            
+            // Set use_c_version based on use_python_version (inverted logic)
+            params.use_c_version = !params.use_python_version;
+            
+            // Add unchecked checkboxes as false
+            if (!params.use_python_version) params.use_python_version = false;
+            if (!params.force_restart) params.force_restart = false;
+            
+            try {
+                const response = await fetch('/api/start_job', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(params)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Show success message with job ID
+                    showJobStartedAlert(result.job_id);
+                    
+                    // Add job to recent jobs list
+                    const job = {
+                        id: result.job_id,
+                        status: 'pending',
+                        created_at: new Date().toISOString()
+                    };
+                    addJobToList(job);
+                } else {
+                    showAlert(`Error: ${result.error}`, 'danger');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'danger');
+            }
+        });
+
+        function lookupJob() {
+            const jobId = document.getElementById('jobIdInput').value.trim();
+            
+            if (!jobId) {
+                showAlert('请输入任务ID', 'warning');
+                return;
+            }
+            
+            // Validate job ID format (basic UUID format check)
+            const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidPattern.test(jobId)) {
+                showAlert('任务ID格式不正确，请检查后重试', 'warning');
+                return;
+            }
+            
+            // Check if job exists
+            fetch(`/api/job/${jobId}`)
+                .then(response => {
+                    if (response.ok) {
+                        // Job exists, redirect to job page
+                        window.location.href = `/job/${jobId}`;
+                    } else if (response.status === 404) {
+                        showAlert('未找到该任务ID，请检查是否输入正确', 'danger');
+                    } else {
+                        showAlert('查询任务时发生错误，请稍后重试', 'danger');
+                    }
+                })
+                .catch(error => {
+                    showAlert('网络错误，请检查连接后重试', 'danger');
+                });
+        }
+
+        function showJobStartedAlert(jobId) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                <h6><i class="fas fa-check-circle me-2"></i>任务已成功启动！</h6>
+                <div class="mt-2 mb-3">
+                    <strong>任务ID:</strong> 
+                    <code id="jobId-${jobId}" style="user-select: all; background: rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 4px;">${jobId}</code>
+                    <button class="btn btn-sm btn-outline-light ms-2" onclick="copyJobId('${jobId}')" title="复制任务ID">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/job/${jobId}" class="btn btn-light btn-sm">
+                        <i class="fas fa-eye me-1"></i>立即查看
+                    </a>
+                    <button type="button" class="btn btn-outline-light btn-sm" onclick="stayOnPage('${jobId}')">
+                        <i class="fas fa-tasks me-1"></i>继续提交任务
+                    </button>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+            `;
+            alertContainer.appendChild(alertDiv);
+        }
+
+        function copyJobId(jobId) {
+            // Try to use the Clipboard API first
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(jobId).then(() => {
+                    showTempMessage('任务ID已复制到剪贴板', 'success');
+                }).catch(() => {
+                    fallbackCopyJobId(jobId);
+                });
+            } else {
+                fallbackCopyJobId(jobId);
+            }
+        }
+
+        function fallbackCopyJobId(jobId) {
+            // Fallback method for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = jobId;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showTempMessage('任务ID已复制到剪贴板', 'success');
+            } catch (err) {
+                showTempMessage('复制失败，请手动复制任务ID', 'warning');
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function stayOnPage(jobId) {
+            // Close the alert and populate the job lookup field
+            document.querySelector('.alert').remove();
+            document.getElementById('jobIdInput').value = jobId;
+            showTempMessage('任务ID已填入查看框，您可以继续提交新任务', 'info');
+        }
+
+        function showTempMessage(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const tempAlert = document.createElement('div');
+            tempAlert.className = `alert alert-${type} fade show`;
+            tempAlert.innerHTML = message;
+            alertContainer.appendChild(tempAlert);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                if (tempAlert.parentNode) {
+                    tempAlert.remove();
+                }
+            }, 3000);
+        }
+
+        // Allow Enter key to trigger job lookup
+        document.getElementById('jobIdInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                lookupJob();
+            }
+        });
+    </script>
+</body>
+</html> 
