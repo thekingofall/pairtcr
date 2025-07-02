@@ -260,13 +260,17 @@ class PipelineRunner:
             return True
         
         if self.use_c_version:
-            # Use C version
+            # Try to use C version
             c_executable = os.path.join(self.scripts_dir, "1_preprocess_and_trim")
             if not os.path.exists(c_executable):
-                print(f"Error: C executable not found at {c_executable}")
-                print("Please compile the C version first by running 'make' in the scripts directory")
-                return False
-            
+                print(f"Warning: C executable not found at {c_executable}")
+                print("Falling back to Python version for preprocessing...")
+                self.logger.warning("C executable not found, falling back to Python version")
+                self.use_c_version = False  # Switch to Python version
+        
+        if self.use_c_version:
+            # Use C version (confirmed to exist)
+            c_executable = os.path.join(self.scripts_dir, "1_preprocess_and_trim")
             cmd = [
                 c_executable,
                 self.input_dir,
@@ -652,12 +656,36 @@ echo "--- MiXCR Analysis and Export Steps Completed ---"
             self.cleanup_incomplete_run()
         
         try:
-            # Run all pipeline steps
-            self.step1_preprocess_and_trim()
-            self.step2_create_umi_pairs()
-            self.step2_5_create_matched_fastq()
-            self.step3_run_mixcr()
-            self.step4_pair_and_filter()
+            # Run all pipeline steps with proper error checking
+            if not self.step1_preprocess_and_trim():
+                error_msg = "Step 1 (Preprocess and Trim) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
+                
+            if not self.step2_create_umi_pairs():
+                error_msg = "Step 2 (Create UMI Pairs) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
+                
+            if not self.step2_5_create_matched_fastq():
+                error_msg = "Step 2.5 (Create Matched FASTQ) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
+                
+            if not self.step3_run_mixcr():
+                error_msg = "Step 3 (Run MiXCR) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
+                
+            if not self.step4_pair_and_filter():
+                error_msg = "Step 4 (Pair and Filter Clones) failed"
+                self.logger.error(error_msg)
+                print(f"Error: {error_msg}")
+                sys.exit(1)
             
             print("\n" + "="*60)
             print("PIPELINE COMPLETED SUCCESSFULLY!")

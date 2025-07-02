@@ -7,12 +7,14 @@ recursive-include scripts *.c
 recursive-include scripts Makefile
 recursive-include scripts mixcr
 recursive-include scripts mixcr.jar
+recursive-include scripts 1_preprocess_and_trim
 recursive-include pairtcr/scripts *.py
 recursive-include pairtcr/scripts *.sh
 recursive-include pairtcr/scripts *.c
 recursive-include pairtcr/scripts Makefile
 recursive-include pairtcr/scripts mixcr
 recursive-include pairtcr/scripts mixcr.jar
+recursive-include pairtcr/scripts 1_preprocess_and_trim
 global-exclude *.pyc
 global-exclude __pycache__
 global-exclude .git*

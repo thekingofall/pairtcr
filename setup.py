@@ -124,6 +124,7 @@ setup(
             'scripts/Makefile',
             'scripts/mixcr',
             'scripts/mixcr.jar',
+            'scripts/1_preprocess_and_trim',
         ],
     },
     cmdclass={
