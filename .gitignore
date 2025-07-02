@@ -1,0 +1,28 @@
+# Exclude test data and large files
+
+# Ignore entire tests directory (contains large datasets)
+tests/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions build
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Logs
+*.log
+
+# OS / Editor files
+.DS_Store
+.idea/
+.vscode/

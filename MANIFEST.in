@@ -1,0 +1,11 @@
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include scripts *.py
+recursive-include scripts *.sh
+recursive-include scripts *.c
+recursive-include scripts Makefile
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .git*
+global-exclude .DS_Store 
