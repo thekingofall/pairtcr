@@ -15,8 +15,22 @@ from . import get_version, get_package_info
 def get_scripts_dir():
     """Get the path to the scripts directory"""
     package_dir = os.path.dirname(__file__)
-    scripts_dir = os.path.join(os.path.dirname(package_dir), 'scripts')
-    return scripts_dir
+    # The scripts directory is typically installed inside the package directory
+    scripts_dir_internal = os.path.join(package_dir, 'scripts')
+
+    # Fallback #1: scripts directory as a *sibling* of the package directory (older layout)
+    scripts_dir_sibling = os.path.join(os.path.dirname(package_dir), 'scripts')
+
+    # Fallback #2: repository-style layout (two levels up from this file)
+    scripts_dir_repo = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts')
+
+    # Pick the first existing directory
+    for candidate in (scripts_dir_internal, scripts_dir_sibling, scripts_dir_repo):
+        if os.path.isdir(candidate):
+            return candidate
+
+    # If nothing exists, return the internal path (default) – the caller will handle the error
+    return scripts_dir_internal
 
 def run_script(script_name, args=None):
     """Run a script from the scripts directory"""

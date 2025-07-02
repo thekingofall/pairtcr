@@ -5,7 +5,9 @@ A high-performance toolkit for processing paired TCR sequencing data
 """
 
 from setuptools import setup, find_packages
+from setuptools.command.build_py import build_py
 import os
+import shutil
 
 # Read the contents of README file
 def read_file(fname):
@@ -28,6 +30,24 @@ def get_version():
     except FileNotFoundError:
         pass
     return "0.1.0"
+
+class CustomBuildPy(build_py):
+    """Custom build command to copy scripts into package directory"""
+    def run(self):
+        # Copy scripts directory into pairtcr package if it doesn't exist
+        source_scripts = os.path.join(self.build_lib, '..', '..', 'scripts')
+        target_scripts = os.path.join(self.build_lib, 'pairtcr', 'scripts')
+        
+        # Create the target directory if it doesn't exist
+        os.makedirs(os.path.dirname(target_scripts), exist_ok=True)
+        
+        # Copy scripts if source exists and target doesn't exist
+        if os.path.exists(source_scripts) and not os.path.exists(target_scripts):
+            print(f"Copying scripts from {source_scripts} to {target_scripts}")
+            shutil.copytree(source_scripts, target_scripts)
+        
+        # Run the standard build
+        build_py.run(self)
 
 # Requirements
 install_requires = [
@@ -102,7 +122,12 @@ setup(
             'scripts/*.sh',
             'scripts/*.c',
             'scripts/Makefile',
+            'scripts/mixcr',
+            'scripts/mixcr.jar',
         ],
+    },
+    cmdclass={
+        'build_py': CustomBuildPy,
     },
     zip_safe=False,
     keywords=['tcr', 'sequencing', 'bioinformatics', 'immunology', 'paired-end'],

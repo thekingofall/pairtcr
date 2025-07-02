@@ -404,100 +404,88 @@ class PipelineRunner:
             print("Step 3: Run MiXCR - SKIPPED (already completed)")
             return True
         
-        # Modify the shell script to use our parameters
+        # Determine how to call MiXCR (jar vs executable)
+        if str(self.mixcr_jar).endswith('.jar'):
+            mixcr_call = f"java -jar \"{self.mixcr_jar}\""
+        else:
+            mixcr_call = f"\"{self.mixcr_jar}\""
+        
+        # Build the shell script with the resolved MiXCR command
         mixcr_script = f"""#!/bin/bash
 
-# --- MiXCR Paired Analysis Shell Script (Modified for Pipeline) ---
-set -e
+# --- MiXCR Paired Analysis Shell Script (Auto-generated) ---
+set -euo pipefail
 
-MIXCR_JAR="{self.mixcr_jar}"
+# How to invoke MiXCR (either jar or executable)
+MIXCR_CALL="{mixcr_call}"
+
+# I/O settings
 INPUT_DIR="{self.matched_fastq_output}"
 PREFIX="{self.prefix}_matched"
 OUTPUT_DIR="{self.step3_output}"
 THREADS={self.threads}
 
-# Define expected filenames
-TRA_VDJCA_OUTPUT="${{OUTPUT_DIR}}/TRA.vdjca.vdjca"
-TRB_VDJCA_OUTPUT="${{OUTPUT_DIR}}/TRB.vdjca.vdjca"
-TRA_CLNS_OUTPUT="${{OUTPUT_DIR}}/TRA.vdjca.clns"
-TRB_CLNS_OUTPUT="${{OUTPUT_DIR}}/TRB.vdjca.clns"
-
-echo "--- Starting MiXCR Paired Analysis Workflow ---"
-echo "Results will be saved to: ${{OUTPUT_DIR}}"
-
 # Create output directory
-mkdir -p "${{OUTPUT_DIR}}"
+mkdir -p "$OUTPUT_DIR"
 
-# Analyze TRA Chain
-echo "Step 1: Analyzing TRA chain..."
-java -jar "${{MIXCR_JAR}}" analyze amplicon \\
-    -s hsa \\
-    --starting-material RNA \\
-    --5-end no-v-primers \\
-    --3-end j-primers \\
-    --adapters no-adapters \\
-    --report "${{OUTPUT_DIR}}/TRA_analyze.report.log" \\
-    -t ${{THREADS}} \\
-    --align "-OsaveOriginalReads=true" \\
-    "${{INPUT_DIR}}/${{PREFIX}}_TRA_matched_1.fq.gz" \\
-    "${{INPUT_DIR}}/${{PREFIX}}_TRA_matched_2.fq.gz" \\
-    "${{OUTPUT_DIR}}/TRA.vdjca"
+# Define convenience variables
+TRA_R1="$INPUT_DIR/${{PREFIX}}_TRA_matched_1.fq.gz"
+TRA_R2="$INPUT_DIR/${{PREFIX}}_TRA_matched_2.fq.gz"
+TRB_R1="$INPUT_DIR/${{PREFIX}}_TRB_matched_1.fq.gz"
+TRB_R2="$INPUT_DIR/${{PREFIX}}_TRB_matched_2.fq.gz"
 
-# Analyze TRB Chain
-echo "Step 2: Analyzing TRB chain..."
-java -jar "${{MIXCR_JAR}}" analyze amplicon \\
-    -s hsa \\
-    --starting-material RNA \\
-    --5-end no-v-primers \\
-    --3-end j-primers \\
-    --adapters no-adapters \\
-    --report "${{OUTPUT_DIR}}/TRB_analyze.report.log" \\
-    -t ${{THREADS}} \\
-    --align "-OsaveOriginalReads=true" \\
-    "${{INPUT_DIR}}/${{PREFIX}}_TRB_matched_1.fq.gz" \\
-    "${{INPUT_DIR}}/${{PREFIX}}_TRB_matched_2.fq.gz" \\
-    "${{OUTPUT_DIR}}/TRB.vdjca"
+# --------------------- TRA chain ---------------------
+echo "[MiXCR] TRA analysis (analyze amplicon)"
+$MIXCR_CALL analyze amplicon \
+  -s hsa \
+  --starting-material RNA \
+  --5-end no-v-primers \
+  --3-end j-primers \
+  --adapters no-adapters \
+  --report "$OUTPUT_DIR/TRA_analyze.report.log" \
+  -t $THREADS \
+  --align "-OsaveOriginalReads=true" \
+  "$TRA_R1" "$TRA_R2" \
+  "$OUTPUT_DIR/TRA.vdjca"
 
-# Assemble TRA Clones
-echo "Step 3: Assembling TRA clones..."
-java -jar "${{MIXCR_JAR}}" assemble \\
-    -f \\
-    --report "${{OUTPUT_DIR}}/TRA_assemble.report.log" \\
-    "${{TRA_VDJCA_OUTPUT}}" \\
-    "${{TRA_CLNS_OUTPUT}}"
+# --------------------- TRB chain ---------------------
+echo "[MiXCR] TRB analysis (analyze amplicon)"
+$MIXCR_CALL analyze amplicon \
+  -s hsa \
+  --starting-material RNA \
+  --5-end no-v-primers \
+  --3-end j-primers \
+  --adapters no-adapters \
+  --report "$OUTPUT_DIR/TRB_analyze.report.log" \
+  -t $THREADS \
+  --align "-OsaveOriginalReads=true" \
+  "$TRB_R1" "$TRB_R2" \
+  "$OUTPUT_DIR/TRB.vdjca"
 
-# Assemble TRB Clones
-echo "Step 4: Assembling TRB clones..."
-java -jar "${{MIXCR_JAR}}" assemble \\
-    -f \\
-    --report "${{OUTPUT_DIR}}/TRB_assemble.report.log" \\
-    "${{TRB_VDJCA_OUTPUT}}" \\
-    "${{TRB_CLNS_OUTPUT}}"
+# --------------------- Assemble clones ---------------------
+echo "[MiXCR] Assemble TRA clones"
+$MIXCR_CALL assemble \
+  -f \
+  --report "$OUTPUT_DIR/TRA_assemble.report.log" \
+  "$OUTPUT_DIR/TRA.vdjca" \
+  "$OUTPUT_DIR/TRA.vdjca.clns"
 
-# Export Alignment Information
-echo "Step 5: Exporting alignment info..."
+echo "[MiXCR] Assemble TRB clones"
+$MIXCR_CALL assemble \
+  -f \
+  --report "$OUTPUT_DIR/TRB_assemble.report.log" \
+  "$OUTPUT_DIR/TRB.vdjca" \
+  "$OUTPUT_DIR/TRB.vdjca.clns"
 
-# Export TRA Alignments
-java -jar "${{MIXCR_JAR}}" exportAlignments \\
-    -f \\
-    -descrsR1 \\
-    -vGene \\
-    -jGene \\
-    -nFeature CDR3 \\
-    -aaFeature CDR3 \\
-    "${{TRA_VDJCA_OUTPUT}}" \\
-    "${{OUTPUT_DIR}}/TRA_alignments_export_with_headers.tsv"
+# --------------------- Export alignments ---------------------
+echo "[MiXCR] Export alignments"
+$MIXCR_CALL exportAlignments -f -descrsR1 -vGene -jGene -nFeature CDR3 -aaFeature CDR3 \
+  "$OUTPUT_DIR/TRA.vdjca" \
+  "$OUTPUT_DIR/TRA_alignments_export_with_headers.tsv"
 
-# Export TRB Alignments
-java -jar "${{MIXCR_JAR}}" exportAlignments \\
-    -f \\
-    -descrsR1 \\
-    -vGene \\
-    -jGene \\
-    -nFeature CDR3 \\
-    -aaFeature CDR3 \\
-    "${{TRB_VDJCA_OUTPUT}}" \\
-    "${{OUTPUT_DIR}}/TRB_alignments_export_with_headers.tsv"
+$MIXCR_CALL exportAlignments -f -descrsR1 -vGene -jGene -nFeature CDR3 -aaFeature CDR3 \
+  "$OUTPUT_DIR/TRB.vdjca" \
+  "$OUTPUT_DIR/TRB_alignments_export_with_headers.tsv"
 
 echo "--- MiXCR Analysis and Export Steps Completed ---"
 """
@@ -578,11 +566,30 @@ echo "--- MiXCR Analysis and Export Steps Completed ---"
             print(f"Error: {error_msg}")
             sys.exit(1)
         
+        # Resolve MiXCR location: accept jar path or fallback to 'mixcr' executable in PATH
         if not os.path.exists(self.mixcr_jar):
-            error_msg = f"MiXCR JAR file '{self.mixcr_jar}' does not exist."
-            self.logger.error(error_msg)
-            print(f"Error: {error_msg}")
-            sys.exit(1)
+            # Try environment variable first
+            env_mixcr = os.environ.get("MIXCR_JAR")
+            if env_mixcr and os.path.exists(env_mixcr):
+                warn_msg = (f"MiXCR JAR '{self.mixcr_jar}' not found. "
+                            f"Falling back to environment variable MIXCR_JAR='{env_mixcr}'.")
+                self.logger.warning(warn_msg)
+                print(f"Warning: {warn_msg}")
+                self.mixcr_jar = env_mixcr
+            else:
+                alt_mixcr_path = shutil.which("mixcr")
+                if alt_mixcr_path:
+                    warn_msg = (f"MiXCR JAR '{self.mixcr_jar}' not found. "
+                                f"Falling back to 'mixcr' executable found at: {alt_mixcr_path}")
+                    self.logger.warning(warn_msg)
+                    print(f"Warning: {warn_msg}")
+                    self.mixcr_jar = alt_mixcr_path
+                else:
+                    error_msg = (f"MiXCR JAR file '{self.mixcr_jar}' does not exist and "
+                                 f"'mixcr' executable could not be found in PATH.")
+                    self.logger.error(error_msg)
+                    print(f"Error: {error_msg}")
+                    sys.exit(1)
         
         # Create output root directory
         os.makedirs(self.output_root, exist_ok=True)
